@@ -2,6 +2,13 @@
 
 HTML5 Canvas Floodfill via JavaScript
 
+## Robobflow modifications:
+
+Updated to support node-canvas. Added `blurEdges` to help with background erasing
+and `randomHSL` to add basic image augmentation support.
+
+Usage example via https://blog.roboflow.ai/how-to-create-a-synthetic-dataset
+
 ## How to use it:
 
 Include it old-school
@@ -90,7 +97,6 @@ The tolerance, which allows for the algorithm to fill similar pixels.  The defau
 #### uint width, uint height
 The width and height of the two-dimensional construct that is bound to the data object.  As the data object is a two dimensional array of 4 byte blocks representing RGBA pixels, the width and height must match the dimensions of the data object.  The values are validated during method call to ensure the ratio ```data.length===width*height*4```.  A mismatch will result in an error being thrown.
 
-## Examples 
+## Examples
 
 See the code in examples/tests.html
-

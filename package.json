@@ -1,6 +1,6 @@
 {
-  "name": "floodfill",
-  "version": "2.1.1",
+  "name": "@roboflow/floodfill",
+  "version": "2.1.4",
   "description": "Zero dependency canvas floodfill",
   "main": "floodfill.js",
   "directories": {
@@ -22,5 +22,8 @@
   "bugs": {
     "url": "https://github.com/binarymax/floodfill.js/issues"
   },
-  "homepage": "https://github.com/binarymax/floodfill.js#readme"
+  "homepage": "https://github.com/binarymax/floodfill.js#readme",
+  "dependencies": {
+    "parse-color": "^1.0.0"
+  }
 }

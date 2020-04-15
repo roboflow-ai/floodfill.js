@@ -1,10 +1,10 @@
-var floodfill = (function() {
+var parseColor = require('parse-color');
 
+module.exports = function(CanvasRenderingContext2D) {
 	//Copyright(c) Max Irwin - 2011, 2015, 2016
 	//MIT License
 
 	function floodfill(data,x,y,fillcolor,tolerance,width,height) {
-
 		var length = data.length;
 		var Q = [];
 		var i = (x+y*width)*4;
@@ -19,7 +19,7 @@ var floodfill = (function() {
 			if(pixelCompareAndSet(i,targetcolor,fillcolor,data,length,tolerance)) {
 				e = i;
 				w = i;
-				mw = parseInt(i/w2)*w2; //left bound
+				mw = parseInt(i/w2)*w2-1; //left bound
 				me = mw+w2;             //right bound
 				while(mw<w && mw<(w-=4) && pixelCompareAndSet(w,targetcolor,fillcolor,data,length,tolerance)); //go left until edge hit
 				while(me>e && me>(e+=4) && pixelCompareAndSet(e,targetcolor,fillcolor,data,length,tolerance)); //go right until edge hit
@@ -30,7 +30,7 @@ var floodfill = (function() {
 			}
 		}
 		return data;
-	};
+	}
 
 	function pixelCompare(i,targetcolor,fillcolor,data,length,tolerance) {
 		if (i<0||i>=length) return false; //out of bounds
@@ -58,7 +58,7 @@ var floodfill = (function() {
 		) return true; //target to surface within tolerance
 
 		return false; //no match
-	};
+	}
 
 	function pixelCompareAndSet(i,targetcolor,fillcolor,data,length,tolerance) {
 		if(pixelCompare(i,targetcolor,fillcolor,data,length,tolerance)) {
@@ -70,10 +70,10 @@ var floodfill = (function() {
 			return true;
 		}
 		return false;
-	};
+	}
 
 	function fillUint8ClampedArray(data,x,y,color,tolerance,width,height) {
-		if (!data instanceof Uint8ClampedArray) throw new Error("data must be an instance of Uint8ClampedArray");
+		if (!(data instanceof Uint8ClampedArray)) throw new Error("data must be an instance of Uint8ClampedArray");
 		if (isNaN(width)  || width<1)  throw new Error("argument 'width' must be a positive integer");
 		if (isNaN(height) || height<1) throw new Error("argument 'height' must be a positive integer");
 		if (isNaN(x) || x<0) throw new Error("argument 'x' must be a positive integer");
@@ -90,33 +90,24 @@ var floodfill = (function() {
 		tolerance = (!isNaN(tolerance)) ? Math.min(Math.abs(Math.round(tolerance)),254) : 0;
 
 		return floodfill(data,xi,yi,color,tolerance,width,height);
-	};
+	}
 
 	var getComputedColor = function(c) {
-		var temp = document.createElement("div");
-		var color = {r:0,g:0,b:0,a:0};
-		temp.style.color = c;
-		temp.style.display = "none";
-		document.body.appendChild(temp);
-		//Use native window.getComputedStyle to parse any CSS color pattern
-		var style = window.getComputedStyle(temp,null).color;
-		document.body.removeChild(temp);
+		var vals = parseColor(c).rgba;
 
-		var recol = /([\.\d]+)/g;
-		var vals  = style.match(recol);
-		if (vals && vals.length>2) {
-			//Coerce the string value into an rgba object
-			color.r = parseInt(vals[0])||0;
-			color.g = parseInt(vals[1])||0;
-			color.b = parseInt(vals[2])||0;
-			color.a = Math.round((parseFloat(vals[3])||1.0)*255);
-		}
+		var color = {r:0,g:0,b:0,a:0};
+		//Coerce the string value into an rgba object
+		color.r = parseInt(vals[0])||0;
+		color.g = parseInt(vals[1])||0;
+		color.b = parseInt(vals[2])||0;
+		color.a = parseInt(vals[3])||0;
+
 		return color;
 	};
 
 	function fillContext(x,y,tolerance,left,top,right,bottom) {
 		var ctx  = this;
-		
+
 		//Gets the rgba color from the context fillStyle
 		var color = getComputedColor(this.fillStyle);
 
@@ -127,22 +118,187 @@ var floodfill = (function() {
 		bottom   = (!isNaN(bottom)&&bottom) ? Math.min(Math.abs(bottom),ctx.canvas.height) : ctx.canvas.height;
 
 		var image = ctx.getImageData(left,top,right,bottom);
-		
+
 		var data = image.data;
 		var width = image.width;
 		var height = image.height;
-		
+
 		if(width>0 && height>0) {
 			fillUint8ClampedArray(data,x,y,color,tolerance,width,height);
 			ctx.putImageData(image,left,top);
 		}
-	};
+	}
+
+	function blurEdges(amount) {
+		var mult = 1-amount;
+
+		var ctx  = this;
+
+		//Defaults and type checks for image boundaries
+		left     = 0;
+		top      = 0;
+		right    = ctx.canvas.width;
+		bottom   = ctx.canvas.height;
+
+		var image = ctx.getImageData(left,top,right,bottom);
+
+		var data = image.data;
+
+		var length = data.length;
+		var Q = [];
+		var i;
+		var w2 = right*4;
+
+		var edges = [];
+		for(i=0; i<length; i+=4) {
+			if(data[i+3] == 0) {
+				// this is a fully transparent pixel
+				// so its neighbors are edges
+				edges[i-4] = 1;
+				edges[i+4] = 1;
+				edges[i-w2] = 1;
+				edges[i+w2] = 1;
+			}
+		}
+
+		for(i=0; i<length; i++) {
+			// blend the edge
+			if(edges[i]) data[i+3] *= mult;
+		}
+
+		ctx.putImageData(image,left,top);
+	}
+
+	function randomHSL(hAmount, sAmount, lAmount) {
+		hAmount = 1+(Math.random()*hAmount*2-hAmount);
+		sAmount = 1+(Math.random()*sAmount*2-sAmount);
+		lAmount = 1+(Math.random()*lAmount*2-lAmount);
+
+		var ctx  = this;
+
+		//Defaults and type checks for image boundaries
+		left     = 0;
+		top      = 0;
+		right    = ctx.canvas.width;
+		bottom   = ctx.canvas.height;
+
+		var image = ctx.getImageData(left,top,right,bottom);
+
+		var data = image.data;
+
+		var length = data.length;
+		var i;
+		var w2 = right*4;
+		var hsl, rgb;
+
+		for(i=0; i<length; i+= 4) {
+			// if it's not fully transparent
+			if(data[i+3]) {
+				hsl = rgbToHsl(data[i], data[i+1], data[i+2]);
+
+				hsl[0] *= hAmount;
+				if(hsl[0] > 1) hsl[0] -= 1;
+				if(hsl[0] < 0) hsl[0] += 1;
+
+				hsl[1] *= sAmount;
+				if(hsl[1] > 1) hsl[1] = 1;
+				if(hsl[1] < 0) hsl[1] = 0;
+
+				hsl[2] *= lAmount;
+				if(hsl[2] > 1) hsl[2] = 1;
+				if(hsl[2] < 0) hsl[2] = 0;
+
+				rgb = hslToRgb(hsl[0], hsl[1], hsl[2]);
+				data[i] = rgb[0];
+				data[i+1] = rgb[1];
+				data[i+2] = rgb[2];
+			}
+		}
+
+		ctx.putImageData(image,left,top);
+	}
 
 	if (typeof CanvasRenderingContext2D != 'undefined') {
 		CanvasRenderingContext2D.prototype.fillFlood = fillContext;
-	};
+		CanvasRenderingContext2D.prototype.blurEdges = blurEdges;
+		CanvasRenderingContext2D.prototype.randomHSL = randomHSL;
+	}
 
 	return fillUint8ClampedArray;
 
-})();
+};
 
+// color conversion code from https://gist.github.com/mjackson/5311256
+/**
+	 * Converts an RGB color value to HSL. Conversion formula
+	 * adapted from http://en.wikipedia.org/wiki/HSL_color_space.
+	 * Assumes r, g, and b are contained in the set [0, 255] and
+	 * returns h, s, and l in the set [0, 1].
+	 *
+	 * @param   Number  r       The red color value
+	 * @param   Number  g       The green color value
+	 * @param   Number  b       The blue color value
+	 * @return  Array           The HSL representation
+ */
+function rgbToHsl(r, g, b) {
+    r /= 255;
+    g /= 255;
+    b /= 255;
+
+    var max = Math.max(r, g, b), min = Math.min(r, g, b);
+    var h, s, l = (max + min) / 2;
+
+    if (max == min) {
+        h = s = 0; // achromatic
+    } else {
+        var d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+
+        switch (max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+        }
+
+        h /= 6;
+    }
+
+    return [ h, s, l ];
+}
+
+/**
+	 * Converts an HSL color value to RGB. Conversion formula
+	 * adapted from http://en.wikipedia.org/wiki/HSL_color_space.
+	 * Assumes h, s, and l are contained in the set [0, 1] and
+	 * returns r, g, and b in the set [0, 255].
+	 *
+	 * @param   Number  h       The hue
+	 * @param   Number  s       The saturation
+	 * @param   Number  l       The lightness
+	 * @return  Array           The RGB representation
+ */
+function hslToRgb(h, s, l) {
+    var r, g, b;
+
+    if (s == 0) {
+        r = g = b = l; // achromatic
+    } else {
+        var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        var p = 2 * l - q;
+
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+    }
+
+    return [ r * 255, g * 255, b * 255 ];
+}
+
+function hue2rgb(p, q, t) {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1/6) return p + (q - p) * 6 * t;
+    if (t < 1/2) return q;
+    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    return p;
+}
